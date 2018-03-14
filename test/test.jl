@@ -15,8 +15,9 @@ foobar()
 TinyCassette.Overdub(foobar)()
 
 # define a context, and override the fallback generated function with a call to `bar`
-struct Context end
-(::TinyCassette.Overdub{typeof(foo),Context})(args...) = bar()
+abstract type GPU end
+struct Context <: GPU end
+(::TinyCassette.Overdub{typeof(foo),<:GPU})(args...) = bar()
 TinyCassette.Overdub(foobar,Context())()
 
 #exit()
