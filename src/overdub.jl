@@ -129,6 +129,22 @@ end
         insert!(body.args, insert_point, expr)
     end
 
+    # fix labels and goto's
+    changes = Dict{Int,Int}()
+    for (i, stmnt) in enumerate(code_info.code)
+        if isa(stmnt, Core.LabelNode)
+            code_info.code[i] = Core.LabelNode(i)
+            changes[stmnt.label] = i
+        end
+    end
+    for (i, stmnt) in enumerate(code_info.code)
+        if isa(stmnt, Core.GotoNode)
+            code_info.code[i] = Core.GotoNode(get(changes, stmnt.label, stmnt.label))
+        elseif Meta.isexpr(stmnt, :gotoifnot)
+            stmnt.args[2] = get(changes, stmnt.args[2], stmnt.args[2])
+        end
+    end
+
     # validate
     errors = Core.Compiler.validate_code(method_instance, code_info)
     for e in errors
