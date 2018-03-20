@@ -3,22 +3,6 @@
 # and/or to debug compiler issues related to overdubbing.
 using TinyCassette
 
-function foobar()
-    foo()
-end
-
-@noinline foo() = println("foo")
-@noinline bar() = println("bar")
-
-# regular execution, without a context
-foobar()
-TinyCassette.Overdub(foobar)()
-
-# define a context, and override the fallback generated function with a call to `bar`
-abstract type GPU end
-struct Context <: GPU end
-(::TinyCassette.Overdub{typeof(foo),<:GPU})(args...) = bar()
-TinyCassette.Overdub(foobar,Context())()
 
 #exit()
 
