@@ -8,7 +8,7 @@ end
 @generated function (o::Overdub{F,C})(args...) where {F,C}
     # configure the global logger to use plain stderr so that we can log without task switches
     old_logger = global_logger()
-    global_logger(Logging.ConsoleLogger(Core.STDERR))
+    global_logger(Logging.ConsoleLogger(Core.stderr))
     @info "Overdubbing function call" func=F types=args
 
     # don't recurse into Core
@@ -59,31 +59,32 @@ end
     worklist = Any[map(item->(item,item), body.args)...] # item & pos to insert before
     while !isempty(worklist)
         item, paren = popfirst!(worklist)
+
         if isa(item, Expr)
-            if item.head == :call
-                # don't overdub calls to self, because this now already points to Overdub
-                orig = item.args[1]
-                if orig != self
-                    # insert new SSA value
-                    ssaval = Core.SSAValue(code_info.ssavaluetypes)
-                    code_info.ssavaluetypes += 1
-
-                    # populate it with the replacement function
-                    dub = GlobalRef(@__MODULE__, :Overdub)
-                    new = :($dub($orig,$context))
-                    def = :($ssaval = $new)
-
-                    # insert the definition right before the use (this is important, as the
-                    # function argument can itself be an SSA value)
-                    pos = findfirst(equalto(paren), body.args)
-                    insert!(body.args, pos, def)
-
-                    item.args[1] = ssaval
-                end
-            end
-
             # queue expr arguments
             append!(worklist, map(item->(item,paren), item.args))
+        end
+
+        if Meta.isexpr(item, :call)
+            # don't overdub calls to self, because this now already points to Overdub
+            orig = item.args[1]
+            if orig != self
+                # insert new SSA value
+                ssaval = Core.SSAValue(code_info.ssavaluetypes)
+                code_info.ssavaluetypes += 1
+
+                # populate it with the replacement function
+                dub = GlobalRef(@__MODULE__, :Overdub)
+                new = :($dub($orig,$context))
+                def = :($ssaval = $new)
+
+                # insert the definition right before the use (this is important, as the
+                # function argument can itself be an SSA value)
+                pos = findfirst(isequal(paren), body.args)
+                insert!(body.args, pos, def)
+
+                item.args[1] = ssaval
+            end
         end
     end
 
@@ -109,27 +110,33 @@ end
         push!(prelude, :($slot = $argval))
     end
     ## fix uses of slots
-    worklist = Any[body.args...]
-    while !isempty(worklist)
-        item = popfirst!(worklist)
-        if isa(item, Expr)
-            for i in 1:length(item.args)
-                arg = item.args[i]
-                if isa(arg, Core.SlotNumber) && arg.id >= 2
-                    # offset by 1 to skip the tuple
-                    item.args[i] = Core.SlotNumber(arg.id+1)
-                end
+    function replace_nodes!(f, code)
+        for (i,node) in enumerate(code)
+            replacement = f(node)
+            if replacement !== nothing
+                code[i] = replacement
+            elseif isa(node, Expr)
+                # visit expr arguments
+                replace_nodes!(f, node.args)
             end
-
-            # queue expr arguments
-            append!(worklist, item.args)
         end
     end
+    replace_nodes!(body.args) do node
+        if isa(node, Core.SlotNumber) && node.id > 1
+            return Core.SlotNumber(node.id+1)
+        elseif isa(node, Core.NewvarNode) && node.slot.id > 1
+            return Core.NewvarNode(Core.SlotNumber(node.slot.id+1))
+        end
+    end
+    if method.isva
+        error("varargs-functions not supported")
+    end
+    ## insert slot definitions
     for expr in reverse(prelude)
         insert!(body.args, insert_point, expr)
     end
 
-    # fix labels and goto's
+    # fix labels and references to them
     changes = Dict{Int,Int}()
     for (i, stmnt) in enumerate(code_info.code)
         if isa(stmnt, Core.LabelNode)
@@ -140,6 +147,8 @@ end
     for (i, stmnt) in enumerate(code_info.code)
         if isa(stmnt, Core.GotoNode)
             code_info.code[i] = Core.GotoNode(get(changes, stmnt.label, stmnt.label))
+        elseif Meta.isexpr(stmnt, :enter)
+            stmnt.args[1] = get(changes, stmnt.args[1], stmnt.args[1])
         elseif Meta.isexpr(stmnt, :gotoifnot)
             stmnt.args[2] = get(changes, stmnt.args[2], stmnt.args[2])
         end
@@ -155,4 +164,3 @@ end
     global_logger(old_logger)
     return code_info
 end
-
