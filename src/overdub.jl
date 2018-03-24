@@ -50,7 +50,9 @@ end
     # substitute static parameters (the called generator doesn't have any)
     Core.Compiler.substitute!(body, 0, Any[], method_signature, static_params, 0, :propagate)
 
-    # prepare a to the context
+    # prepare references to the underlying function and context
+    func = Core.SSAValue(code_info.ssavaluetypes)
+    code_info.ssavaluetypes += 1
     context = Core.SSAValue(code_info.ssavaluetypes)
     code_info.ssavaluetypes += 1
     
@@ -88,26 +90,24 @@ end
         end
     end
 
-    # actually get a handle to the context
-    insert!(body.args, insert_point, :($context =
-        $(Expr(:call, GlobalRef(Core, :getfield), self, QuoteNode(:context)))))
-
     # destructure the splatted argument tuple
+    argc = length(args)
+    paramc = method.nargs - 1
     splat = Core.SlotNumber(2)
     ## fix up codeinfo arrays
     code_info.slotnames = Any[code_info.slotnames[1], Symbol("#args#"), code_info.slotnames[2:end]...]
     code_info.slotflags = Any[code_info.slotflags[1], 0x00,             code_info.slotflags[2:end]...]
     ## generate new slots
     prelude = Expr[]
-    for arg in 1:length(args)
+    for i in 1:paramc
         # insert new slot
-        slotnum = arg+2
+        slotnum = i+2
         slot = Core.SlotNumber(slotnum)
         code_info.slotflags[slotnum] |= 0x01 << 0x01    # mark the slot as assigned to
 
-        # populate it with the actual argument value
-        argval = Expr(:call, GlobalRef(Core, :getfield), splat, arg)
-        push!(prelude, :($slot = $argval))
+        # populate it with the actual argument
+        arg = Expr(:call, GlobalRef(Core, :getfield), splat, i)
+        push!(prelude, :($slot = $arg))
     end
     ## fix uses of slots
     function replace_nodes!(f, code)
@@ -122,19 +122,39 @@ end
         end
     end
     replace_nodes!(body.args) do node
-        if isa(node, Core.SlotNumber) && node.id > 1
+        if isa(node, Core.SlotNumber) && node.id == 1
+            return func
+        elseif isa(node, Core.SlotNumber) && node.id > 1
             return Core.SlotNumber(node.id+1)
         elseif isa(node, Core.NewvarNode) && node.slot.id > 1
             return Core.NewvarNode(Core.SlotNumber(node.slot.id+1))
         end
     end
+    ## special handling for vararg parameters
     if method.isva
-        error("varargs-functions not supported")
+        # the previous final slot assignment is wrong
+        isempty(prelude) || pop!(prelude)
+        # instead create and assign a tuple containing all trailing arguments
+        vararg = Expr(:call, GlobalRef(Core, :tuple))
+        for i in paramc:argc
+            ssa = Core.SSAValue(code_info.ssavaluetypes)
+            arg = Expr(:call, GlobalRef(Core, :getfield), splat, i)
+            push!(prelude, :($ssa = $arg))
+            push!(vararg.args, ssa)
+            code_info.ssavaluetypes += 1
+        end
+        push!(prelude, :($(Core.SlotNumber(paramc + 2)) = $vararg))
     end
     ## insert slot definitions
     for expr in reverse(prelude)
         insert!(body.args, insert_point, expr)
     end
+
+    # actually get the value of the underlying function and context
+    insert!(body.args, insert_point, :($context =
+        $(Expr(:call, GlobalRef(Core, :getfield), self, QuoteNode(:context)))))
+    insert!(body.args, insert_point, :($func =
+        $(Expr(:call, GlobalRef(Core, :getfield), self, QuoteNode(:func)))))
 
     # fix labels and references to them
     changes = Dict{Int,Int}()
