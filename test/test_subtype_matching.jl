@@ -18,5 +18,10 @@ end
     # define a context, as a subtype of some other context
     (::TinyCassette.Overdub{typeof(foo),<:TestSubtypeMatching.GPU})() = bar()
     @test TinyCassette.Overdub(foobar,TestSubtypeMatching.Context())() == "bar"
+end
 
+@testset "subtype matching directly" begin
+    foo() = 0
+    (::TinyCassette.Overdub{typeof(foo), C})() where {C <:TestSubtypeMatching.GPU} = 1
+    @test TinyCassette.Overdub(foo, TestSubtypeMatching.Context())() == 1
 end
