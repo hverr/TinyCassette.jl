@@ -1,6 +1,8 @@
 module TestSubtypeMatching
     abstract type GPU end
     struct Context <: GPU end
+
+    struct T{A} end
 end
 
 @testset "subtype matching" begin
@@ -24,4 +26,12 @@ end
     foo() = 0
     (::TinyCassette.Overdub{typeof(foo), C})() where {C <:TestSubtypeMatching.GPU} = 1
     @test TinyCassette.Overdub(foo, TestSubtypeMatching.Context())() == 1
+end
+
+@testset "access type var" begin
+    foo() = 0
+    (::TinyCassette.Overdub{typeof(foo), <: TestSubtypeMatching.T{A}})() where {A} = A
+
+    @test TinyCassette.Overdub(foo, TestSubtypeMatching.T{3}())() == 3
+    @test TinyCassette.Overdub(foo, TestSubtypeMatching.T{5}())() == 5
 end
