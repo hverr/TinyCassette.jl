@@ -5,7 +5,8 @@ struct Overdub{F,C}
     Overdub(f::F, c::C=nothing) where {F,C} = new{F,C}(f,c)
 end
 
-@generated function (o::Overdub{F,C})(args...) where {F,C}
+#@generated function (o::Overdub{F,C})(args...) where {F,C}
+function overdub(F, o, args)
     # configure the global logger to use plain stderr so that we can log without task switches
     old_logger = global_logger()
     global_logger(Logging.ConsoleLogger(Core.stderr))
@@ -183,4 +184,13 @@ end
     @info "Rewriting code" original=original_code_info overdubbed=code_info
     global_logger(old_logger)
     return code_info
+end
+
+@eval function (o::Overdub{F})(args...) where {F}
+    # manual construction of the generated function in order to control the expand_early arg
+    $(begin
+        stub = Expr(:new, Core.GeneratedFunctionStub, :overdub, Any[:o, :args], Any[:F],
+                    @__LINE__, QuoteNode(Symbol(@__FILE__)), true)
+        Expr(:meta, :generated, stub)
+      end)
 end
