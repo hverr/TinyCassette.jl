@@ -77,7 +77,6 @@ function overdub_recurse_gen(self, ctx, f, args)
     splat = Core.SlotNumber(4) # this won't be bumped later on
     ## fix up codeinfo arrays
     code_info.slotnames = Any[code_info.slotnames[1], Symbol("#ctx#"), Symbol("#f#"), Symbol("#args#"), code_info.slotnames[2:end]...]
-    Core.println("slotnames: ", code_info.slotnames)
     code_info.slotflags = Any[code_info.slotflags[1], 0x00           , 0x00         , 0x00            , code_info.slotflags[2:end]...]
     ## generate new slots
     prelude = Expr[]
