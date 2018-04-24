@@ -24,13 +24,13 @@ end
 
 @testset "subtype matching directly" begin
     foo() = 0
-    TinyCassette.execute(ctx::C, f::typeof(foo)) = 1
+    TinyCassette.execute(ctx::C, f::typeof(foo)) where {C} = 1
     @test TinyCassette.execute(TestSubtypeMatching.Context(), foo) == 1
 end
 
 @testset "access type var" begin
     foo() = 0
-    TinyCassette.execute(ctx::T, f::typeof(foo)) where {T <: TestSubtypeMatching.T{A}} = A
+    TinyCassette.execute(ctx::TestSubtypeMatching.T{A}, f::typeof(foo)) where {A} = A
 
     @test TinyCassette.execute(TestSubtypeMatching.T{3}(), foo) == 3
     @test TinyCassette.execute(TestSubtypeMatching.T{5}(), foo) == 5
