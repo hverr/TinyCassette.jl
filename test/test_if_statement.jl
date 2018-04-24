@@ -8,7 +8,7 @@
             return 0
         end
     end
-    @test TinyCassette.Overdub(bar1)() == 0
+    @test TinyCassette.execute(nothing, bar1) == 0
 
     @noinline foo() = false
     function bar2()
@@ -18,5 +18,5 @@
             return 0
         end
     end
-    @test TinyCassette.Overdub(bar2)() == 0
+    @test TinyCassette.execute(nothing, bar2) == 0
 end

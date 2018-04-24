@@ -5,5 +5,5 @@
         f(3, 4, 5, 6, 7)
     end
 
-    @test TinyCassette.Overdub(foobar)() == 25
+    @test TinyCassette.execute(nothing, foobar) == 25
 end

@@ -15,23 +15,23 @@ end
 
     # regular execution, without a context
     @test foobar() == "foo"
-    @test TinyCassette.Overdub(foobar)() == "foo"
+    @test TinyCassette.execute(nothing, foobar) == "foo"
 
     # define a context, as a subtype of some other context
-    (::TinyCassette.Overdub{typeof(foo),<:TestSubtypeMatching.GPU})() = bar()
-    @test TinyCassette.Overdub(foobar,TestSubtypeMatching.Context())() == "bar"
+    TinyCassette.execute(ctx::TestSubtypeMatching.GPU, f::typeof(foo)) = bar()
+    @test TinyCassette.execute(TestSubtypeMatching.Context(), foobar) == "bar"
 end
 
 @testset "subtype matching directly" begin
     foo() = 0
-    (::TinyCassette.Overdub{typeof(foo), C})() where {C <:TestSubtypeMatching.GPU} = 1
-    @test TinyCassette.Overdub(foo, TestSubtypeMatching.Context())() == 1
+    TinyCassette.execute(ctx::C, f::typeof(foo)) = 1
+    @test TinyCassette.execute(TestSubtypeMatching.Context(), foo) == 1
 end
 
 @testset "access type var" begin
     foo() = 0
-    (::TinyCassette.Overdub{typeof(foo), <: TestSubtypeMatching.T{A}})() where {A} = A
+    TinyCassette.execute(ctx::T, f::typeof(foo)) where {T <: TestSubtypeMatching.T{A}} = A
 
-    @test TinyCassette.Overdub(foo, TestSubtypeMatching.T{3}())() == 3
-    @test TinyCassette.Overdub(foo, TestSubtypeMatching.T{5}())() == 5
+    @test TinyCassette.execute(TestSubtypeMatching.T{3}(), foo) == 3
+    @test TinyCassette.execute(TestSubtypeMatching.T{5}(), foo) == 5
 end

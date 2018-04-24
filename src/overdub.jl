@@ -1,33 +1,32 @@
-# wrapper for overdubbing functions
-struct Overdub{F,C}
-    func::F
-    context::C
-    Overdub(f::F, c::C=nothing) where {F,C} = new{F,C}(f,c)
-end
+@inline execute(ctx::Any, f, args...) = overdub_recurse(ctx, f, args...)
 
-#@generated function (o::Overdub{F,C})(args...) where {F,C}
-function overdub(F, o, args)
+#@generated function overdub_recurse(ctx, f, args...)
+function overdub_recurse_gen(self, ctx, f, args)
     # configure the global logger to use plain stderr so that we can log without task switches
     old_logger = global_logger()
     global_logger(Logging.ConsoleLogger(Core.stderr))
-    @info "Overdubbing function call" func=F types=args
+    @info "Overdubbing function call" func=f types=args
 
     # don't recurse into Core
-    if parentmodule(F) == Core
+    if parentmodule(f) == Core
         global_logger(old_logger)
-        return :((o.func)(args...))
+        return :(f(args...))
     end
 
     # refuse to overdub already-overdubbed functions
-    if F <: Overdub
+    if f <: typeof(execute)
         error("can't double-overdub")
     end
+
+    # slot number flag indicating that it is already set
+    # yes this is hacky :o
+    mark_fixed = Int64(1 << 62)
 
     # retrieve code
     # NOTE: this could use code_lowered if it weren't for F being a function type
     world = typemax(UInt)
     ## initial Method
-    matched_methods = Base._methods_by_ftype(Tuple{F,args...}, -1, world)
+    matched_methods = Base._methods_by_ftype(Tuple{f,args...}, -1, world)
     length(matched_methods) == 1 || error("did not uniquely match method")
     type_signature, raw_static_params, method = first(matched_methods)
     ## initial CodeInfo
@@ -51,14 +50,10 @@ function overdub(F, o, args)
     # substitute static parameters (the called generator doesn't have any)
     Core.Compiler.substitute!(body, 0, Any[], method_signature, static_params, 0, :propagate)
 
-    # prepare references to the underlying function and context
-    func = Core.SSAValue(code_info.ssavaluetypes)
-    code_info.ssavaluetypes += 1
-    context = Core.SSAValue(code_info.ssavaluetypes)
-    code_info.ssavaluetypes += 1
-    
     # rewrite function calls
-    self = Core.SlotNumber(1)
+    # these slotnumbers will not be bumped
+    context_slot = Core.SlotNumber(2 | mark_fixed)
+
     worklist = Any[map(item->(item,item), body.args)...] # item & pos to insert before
     while !isempty(worklist)
         item, paren = popfirst!(worklist)
@@ -69,40 +64,26 @@ function overdub(F, o, args)
         end
 
         if Meta.isexpr(item, :call)
-            # don't overdub calls to self, because this now already points to Overdub
-            orig = item.args[1]
-            if orig != self
-                # insert new SSA value
-                ssaval = Core.SSAValue(code_info.ssavaluetypes)
-                code_info.ssavaluetypes += 1
-
-                # populate it with the replacement function
-                dub = GlobalRef(@__MODULE__, :Overdub)
-                new = :($dub($orig,$context))
-                def = :($ssaval = $new)
-
-                # insert the definition right before the use (this is important, as the
-                # function argument can itself be an SSA value)
-                pos = findfirst(isequal(paren), body.args)
-                insert!(body.args, pos, def)
-
-                item.args[1] = ssaval
-            end
+            orig_func = item.args[1]
+            item.args[1] = GlobalRef(@__MODULE__, :execute)
+            insert!(item.args, 2, context_slot)
+            insert!(item.args, 3, orig_func)
         end
     end
 
     # destructure the splatted argument tuple
     argc = length(args)
     paramc = method.nargs - 1
-    splat = Core.SlotNumber(2)
+    splat = Core.SlotNumber(4) # this won't be bumped later on
     ## fix up codeinfo arrays
-    code_info.slotnames = Any[code_info.slotnames[1], Symbol("#args#"), code_info.slotnames[2:end]...]
-    code_info.slotflags = Any[code_info.slotflags[1], 0x00,             code_info.slotflags[2:end]...]
+    code_info.slotnames = Any[code_info.slotnames[1], Symbol("#ctx#"), Symbol("#f#"), Symbol("#args#"), code_info.slotnames[2:end]...]
+    Core.println("slotnames: ", code_info.slotnames)
+    code_info.slotflags = Any[code_info.slotflags[1], 0x00           , 0x00         , 0x00            , code_info.slotflags[2:end]...]
     ## generate new slots
     prelude = Expr[]
     for i in 1:paramc
         # insert new slot
-        slotnum = i+2
+        slotnum = i+4
         slot = Core.SlotNumber(slotnum)
         code_info.slotflags[slotnum] |= 0x01 << 0x01    # mark the slot as assigned to
 
@@ -124,11 +105,13 @@ function overdub(F, o, args)
     end
     replace_nodes!(body.args) do node
         if isa(node, Core.SlotNumber) && node.id == 1
-            return func
-        elseif isa(node, Core.SlotNumber) && node.id > 1
-            return Core.SlotNumber(node.id+1)
+            return Core.SlotNumber(3)
+        elseif isa(node, Core.SlotNumber) && (node.id & mark_fixed) == mark_fixed
+            return Core.SlotNumber(node.id & ~mark_fixed)
+        elseif isa(node, Core.SlotNumber)
+            return Core.SlotNumber(node.id+3)
         elseif isa(node, Core.NewvarNode) && node.slot.id > 1
-            return Core.NewvarNode(Core.SlotNumber(node.slot.id+1))
+            return Core.NewvarNode(Core.SlotNumber(node.slot.id+3))
         end
     end
     ## special handling for vararg parameters
@@ -144,18 +127,12 @@ function overdub(F, o, args)
             push!(vararg.args, ssa)
             code_info.ssavaluetypes += 1
         end
-        push!(prelude, :($(Core.SlotNumber(paramc + 2)) = $vararg))
+        push!(prelude, :($(Core.SlotNumber(paramc + 4)) = $vararg))
     end
     ## insert slot definitions
     for expr in reverse(prelude)
         insert!(body.args, insert_point, expr)
     end
-
-    # actually get the value of the underlying function and context
-    insert!(body.args, insert_point, :($context =
-        $(Expr(:call, GlobalRef(Core, :getfield), self, QuoteNode(:context)))))
-    insert!(body.args, insert_point, :($func =
-        $(Expr(:call, GlobalRef(Core, :getfield), self, QuoteNode(:func)))))
 
     # fix labels and references to them
     changes = Dict{Int,Int}()
@@ -175,6 +152,9 @@ function overdub(F, o, args)
         end
     end
 
+    code_info.method_for_inference_limit_heuristics = method
+    code_info.inlineable = true
+
     # validate
     errors = Core.Compiler.validate_code(method_instance, code_info)
     for e in errors
@@ -186,11 +166,17 @@ function overdub(F, o, args)
     return code_info
 end
 
-@eval function (o::Overdub{F})(args...) where {F}
+@eval function overdub_recurse(ctx, f, args...)
     # manual construction of the generated function in order to control the expand_early arg
     $(begin
-        stub = Expr(:new, Core.GeneratedFunctionStub, :overdub, Any[:o, :args], Any[:F],
-                    @__LINE__, QuoteNode(Symbol(@__FILE__)), true)
-        Expr(:meta, :generated, stub)
+          stub = Expr(:new,
+                      Core.GeneratedFunctionStub,
+                      :overdub_recurse_gen,
+                      Any[:overdub_recurse, :ctx, :f, :args],
+                      Any[],
+                      @__LINE__,
+                      QuoteNode(Symbol(@__FILE__)),
+                      true)
+          Expr(:meta, :generated, stub)
       end)
 end
