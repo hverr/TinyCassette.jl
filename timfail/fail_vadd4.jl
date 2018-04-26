@@ -10,16 +10,18 @@ end
 
 Base.size(g::CuDeviceArray) = g.shape
 
+Base.checkbounds(::CuDeviceArray, I...) = nothing
+
 function kernel(a, i)
     return a[i]
 end
 
 
-code_llvm(STDOUT, kernel, Tuple{CuDeviceArray{Float32,1}, Int})
+code_llvm(stdout, kernel, Tuple{CuDeviceArray{Float32,1}, Int})
 
 
-using Cassette
-Cassette.@context Ctx
+using TinyCassette
+struct GPUctx end
 
-code_llvm(STDOUT, Cassette.overdub(Ctx, kernel),
-          Tuple{CuDeviceArray{Float32,1}, Int})
+code_llvm(stdout, TinyCassette.execute,
+          Tuple{GPUctx, typeof(kernel), CuDeviceArray{Float32,1}, Int})
