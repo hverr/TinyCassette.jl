@@ -1,7 +1,8 @@
 code_warntype(unsafe_load, Tuple{Ptr{Float32}})
 
 
-using Cassette
-Cassette.@context Ctx
+using TinyCassette
+struct GPUctx end
 
-code_warntype(Cassette.overdub(Ctx, unsafe_load), Tuple{Ptr{Float32}})
+code_warntype(TinyCassette.execute,
+              Tuple{GPUctx, typeof(unsafe_load), Ptr{Float32}})
