@@ -15,6 +15,8 @@ end
 
 Base.size(g::CuDeviceArray) = g.shape
 
+Base.checkbounds(::CuDeviceArray, I...) = nothing
+
 function kernel_vadd(a, b, c, i)
     c[i] = a[i] + b[i]
 
@@ -22,17 +24,18 @@ function kernel_vadd(a, b, c, i)
 end
 
 
-code_llvm(STDOUT, kernel_vadd, Tuple{CuDeviceArray{Float32,1},
+code_llvm(stdout, kernel_vadd, Tuple{CuDeviceArray{Float32,1},
                                      CuDeviceArray{Float32,1},
                                      CuDeviceArray{Float32,1},
                                      Int})
 
 
-using Cassette
-Cassette.@context Ctx
+using TinyCassette
+struct Ctx end
 
-code_llvm(STDOUT, Cassette.overdub(Ctx, kernel_vadd),
-          Tuple{CuDeviceArray{Float32,1},
+code_llvm(stdout, TinyCassette.execute,
+          Tuple{Ctx, typeof(kernel_vadd),
+                CuDeviceArray{Float32,1},
                 CuDeviceArray{Float32,1},
                 CuDeviceArray{Float32,1},
                 Int})
