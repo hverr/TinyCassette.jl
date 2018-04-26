@@ -8,7 +8,8 @@ function overdub_recurse_gen(self, ctx, f, args)
     @info "Overdubbing function call" func=f types=args
 
     # don't recurse into Core
-    if parentmodule(f) == Core
+    if parentmodule(f) == Core || f == typeof(Base.getindex)
+        @info "Can't overdub Core function"
         global_logger(old_logger)
         return :(f(args...))
     end
