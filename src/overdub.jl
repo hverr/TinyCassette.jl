@@ -82,10 +82,10 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
 
         if Meta.isexpr(item, :call)
             orig_func = item.args[1]
-            if isempty(inbounds_stack)
-                item.args[1] = GlobalRef(@__MODULE__, :execute)
-            else
+            if !isempty(inbounds_stack) || inbounds <: Val{true}
                 item.args[1] = GlobalRef(@__MODULE__, :execute_inbounds)
+            else
+                item.args[1] = GlobalRef(@__MODULE__, :execute)
             end
             insert!(item.args, 2, context_slot)
             insert!(item.args, 3, orig_func)
