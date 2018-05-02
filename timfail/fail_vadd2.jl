@@ -44,7 +44,7 @@ end
 @inline threadIdx() = (threadIdx_x(), threadIdx_y(), threadIdx_z())
 
 function kernel_vadd(a, b, c)
-    i = (blockIdx()[1]-1) * blockDim()[1] + threadIdx()[1]
+    i = (blockIdx()[1]-UInt32(1)) * blockDim()[1] + threadIdx()[1]
     c[i] = a[i] + b[i]
 
     return nothing
