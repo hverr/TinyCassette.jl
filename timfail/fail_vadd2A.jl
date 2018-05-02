@@ -21,10 +21,15 @@ Base.checkbounds(::CuDeviceArray, I...) = nothing
 @inline blockIdx_y() = (ccall("llvm.nvvm.read.ptx.sreg.ctaid.y", llvmcall, UInt32, ()))+UInt32(1)
 @inline blockIdx_z() = (ccall("llvm.nvvm.read.ptx.sreg.ctaid.z", llvmcall, UInt32, ()))+UInt32(1)
 
+@inline blockDim_x() = (ccall("llvm.nvvm.read.ptx.sreg.ntid.x", llvmcall, UInt32, ()))+UInt32(1)
+@inline blockDim_y() = (ccall("llvm.nvvm.read.ptx.sreg.ntid.y", llvmcall, UInt32, ()))+UInt32(1)
+@inline blockDim_z() = (ccall("llvm.nvvm.read.ptx.sreg.ntid.z", llvmcall, UInt32, ()))+UInt32(1)
+
 @inline blockIdx() = (blockIdx_x(), blockIdx_y(), blockIdx_z())
+@inline blockDim() = (blockIdx_x(), blockIdx_y(), blockIdx_z())
 
 function kernel_vadd(a, b, c)
-    i = blockIdx()[1]-UInt32(1)
+    i = (blockIdx()[1]-UInt32(1)) * blockDim()[1]
     c[i] = a[i] + b[i]
 
     return nothing
