@@ -17,24 +17,24 @@ Base.size(g::CuDeviceArray) = g.shape
 
 Base.checkbounds(::CuDeviceArray, I...) = nothing
 
-@inline blockIdx_x() = (ccall("llvm.nvvm.read.ptx.sreg.ctaid.x", llvmcall, UInt32, ()))+UInt32(1)
-@inline blockIdx_y() = (ccall("llvm.nvvm.read.ptx.sreg.ctaid.y", llvmcall, UInt32, ()))+UInt32(1)
-@inline blockIdx_z() = (ccall("llvm.nvvm.read.ptx.sreg.ctaid.z", llvmcall, UInt32, ()))+UInt32(1)
+@inline blockIdx_x() = Int((ccall("llvm.nvvm.read.ptx.sreg.ctaid.x", llvmcall, UInt32, ()))+UInt32(1))
+@inline blockIdx_y() = Int((ccall("llvm.nvvm.read.ptx.sreg.ctaid.y", llvmcall, UInt32, ()))+UInt32(1))
+@inline blockIdx_z() = Int((ccall("llvm.nvvm.read.ptx.sreg.ctaid.z", llvmcall, UInt32, ()))+UInt32(1))
 
-@inline blockDim_x() = (ccall("llvm.nvvm.read.ptx.sreg.ntid.x", llvmcall, UInt32, ()))+UInt32(1)
-@inline blockDim_y() = (ccall("llvm.nvvm.read.ptx.sreg.ntid.y", llvmcall, UInt32, ()))+UInt32(1)
-@inline blockDim_z() = (ccall("llvm.nvvm.read.ptx.sreg.ntid.z", llvmcall, UInt32, ()))+UInt32(1)
+@inline blockDim_x() = Int((ccall("llvm.nvvm.read.ptx.sreg.ntid.x", llvmcall, UInt32, ()))+UInt32(1))
+@inline blockDim_y() = Int((ccall("llvm.nvvm.read.ptx.sreg.ntid.y", llvmcall, UInt32, ()))+UInt32(1))
+@inline blockDim_z() = Int((ccall("llvm.nvvm.read.ptx.sreg.ntid.z", llvmcall, UInt32, ()))+UInt32(1))
 
-@inline threadIdx_x() = (ccall("llvm.nvvm.read.ptx.sreg.tid.x", llvmcall, UInt32, ()))+UInt32(1)
-@inline threadIdx_y() = (ccall("llvm.nvvm.read.ptx.sreg.tid.y", llvmcall, UInt32, ()))+UInt32(1)
-@inline threadIdx_z() = (ccall("llvm.nvvm.read.ptx.sreg.tid.z", llvmcall, UInt32, ()))+UInt32(1)
+@inline threadIdx_x() = Int((ccall("llvm.nvvm.read.ptx.sreg.tid.x", llvmcall, UInt32, ()))+UInt32(1))
+@inline threadIdx_y() = Int((ccall("llvm.nvvm.read.ptx.sreg.tid.y", llvmcall, UInt32, ()))+UInt32(1))
+@inline threadIdx_z() = Int((ccall("llvm.nvvm.read.ptx.sreg.tid.z", llvmcall, UInt32, ()))+UInt32(1))
 
 @inline blockIdx() = (blockIdx_x(), blockIdx_y(), blockIdx_z())
 @inline blockDim() = (blockDim_x(), blockDim_y(), blockDim_z())
 @inline threadIdx() = (threadIdx_x(), threadIdx_y(), threadIdx_z())
 
 function kernel_vadd(a, b, c)
-    i = (blockIdx()[1]-UInt32(1)) * blockDim()[1] + threadIdx()[1]
+    i = (blockIdx()[1]-1) * blockDim()[1] + threadIdx()[1]
     c[i] = a[i] + b[i]
 
     return nothing
