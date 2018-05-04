@@ -8,9 +8,13 @@ end
 
 #@inline blockIdx_x() = Int((ccall("llvm.nvvm.read.ptx.sreg.ctaid.x", llvmcall, UInt32, ()))+UInt32(1))
 @inline blockIdx_x() = _index(Val(:x))
+@inline blockIdx_y() = _index(Val(:y))
+@inline blockIdx_z() = _index(Val(:z))
+
+@inline blockIdx() = (x=blockIdx_x(), y=blockIdx_y(), z=blockIdx_z())
 
 function kernel_vadd()
-    blockIdx_x()-1
+    blockIdx().x-1
 end
 
 
