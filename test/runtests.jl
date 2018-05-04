@@ -7,4 +7,5 @@ using Test: @testset, @test, @test_throws
     include("test_subtype_matching.jl")
     include("test_vararg.jl")
     include("test_infer.jl")
+    include("test_generated.jl")
 end
