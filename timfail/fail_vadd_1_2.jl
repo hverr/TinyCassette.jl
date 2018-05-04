@@ -2,7 +2,7 @@
 @generated function _index(::Val{name}) where {name}
     #:(Int((ccall("llvm.nvvm.read.ptx.sreg.ctaid.x", llvmcall, UInt32, ()))+UInt32(1)))
 
-    s = "llvm.nvvm.read.ptx.sreg.ctaid.x"
+    s = "llvm.nvvm.read.ptx.sreg.ctaid.$name"
     :(Int((ccall($s, llvmcall, UInt32, ()))+UInt32(1)))
 end
 
