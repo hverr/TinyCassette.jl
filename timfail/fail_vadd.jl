@@ -1,7 +1,7 @@
 using CUDAnative
 
 function kernel_vadd(a, b, c)
-    i = 1 #(blockIdx().x-1) * blockDim().x + threadIdx().x
+    i = (blockIdx().x-1) * blockDim().x + threadIdx().x
     c[i] = a[i] + b[i]
 
     return nothing
