@@ -20,7 +20,7 @@ function kernel_vadd(a::DevicePtr{T,A}, b::DevicePtr{T,A}, c::DevicePtr{T,A}, i:
 end
 
 
-Base.code_llvm(stdout, kernel_vadd, Tuple{DevicePtr{Float32,AS.Global},
+Base.code_warntype(stdout, kernel_vadd, Tuple{DevicePtr{Float32,AS.Global},
                                           DevicePtr{Float32,AS.Global},
                                           DevicePtr{Float32,AS.Global},
                                           Int})

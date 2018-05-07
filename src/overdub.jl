@@ -82,10 +82,23 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
 
         if Meta.isexpr(item, :call)
             orig_func = item.args[1]
+            dump(orig_func)
+
             if orig_func == GlobalRef(Main, :Val) ||
-                    orig_func == GlobalRef(Main, :datatype_align) ||
                     orig_func == GlobalRef(Main, :unsafe_load) ||
-                    orig_func == GlobalRef(Main, :unsafe_store)
+                    orig_func == GlobalRef(Main, :unsafe_store) ||
+                    orig_func == GlobalRef(Main, :convert) ||
+                    orig_func == GlobalRef(Main, :sizeof) ||
+                    orig_func == GlobalRef(Main, :(-)) ||
+                    orig_func == GlobalRef(Main, :(+)) ||
+                    orig_func == GlobalRef(Main, :(*)) ||
+                    orig_func == GlobalRef(Main, :(/)) ||
+                    orig_func == GlobalRef(Main, :(&)) ||
+                    orig_func == GlobalRef(Main, :(|)) ||
+                    orig_func == GlobalRef(Main, :datatype_align) ||
+                    orig_func == GlobalRef(Base, :literal_pow) ||
+                    orig_func == GlobalRef(Base, :getproperty) ||
+                    orig_func == GlobalRef(Core, :apply_type)
                 continue
             end
 
