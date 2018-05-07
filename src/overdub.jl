@@ -98,9 +98,7 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
                     (isa(orig_func, GlobalRef) && orig_func.name == :datatype_align) ||
                     orig_func == GlobalRef(Base, :literal_pow) ||
                     orig_func == GlobalRef(Base, :getproperty) ||
-                    orig_func == GlobalRef(Core, :apply_type) ||
-                    orig_func == GlobalRef(Core, :tuple) ||
-                    orig_func == GlobalRef(Core, :_apply)
+                    (isa(orig_func, GlobalRef) && orig_func.mod == Core)
                 continue
             end
 
