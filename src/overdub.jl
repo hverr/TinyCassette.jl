@@ -89,16 +89,19 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
                     orig_func == GlobalRef(Main, :unsafe_store) ||
                     orig_func == GlobalRef(Main, :convert) ||
                     orig_func == GlobalRef(Main, :sizeof) ||
-                    orig_func == GlobalRef(Main, :(-)) ||
-                    orig_func == GlobalRef(Main, :(+)) ||
-                    orig_func == GlobalRef(Main, :(*)) ||
-                    orig_func == GlobalRef(Main, :(/)) ||
-                    orig_func == GlobalRef(Main, :(&)) ||
-                    orig_func == GlobalRef(Main, :(|)) ||
+                    (isa(orig_func, GlobalRef) && orig_func.name == :(-)) ||
+                    (isa(orig_func, GlobalRef) && orig_func.name == :(+)) ||
+                    (isa(orig_func, GlobalRef) && orig_func.name == :(*)) ||
+                    (isa(orig_func, GlobalRef) && orig_func.name == :(/)) ||
+                    (isa(orig_func, GlobalRef) && orig_func.name == :(&)) ||
+                    (isa(orig_func, GlobalRef) && orig_func.name == :(|)) ||
+                    (isa(orig_func, GlobalRef) && orig_func.name == :Int) ||
                     (isa(orig_func, GlobalRef) && orig_func.name == :datatype_align) ||
                     orig_func == GlobalRef(Base, :literal_pow) ||
                     orig_func == GlobalRef(Base, :getproperty) ||
-                    orig_func == GlobalRef(Core, :apply_type)
+                    orig_func == GlobalRef(Core, :apply_type) ||
+                    orig_func == GlobalRef(Core, :tuple) ||
+                    orig_func == GlobalRef(Core, :_apply)
                 continue
             end
 
