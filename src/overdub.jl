@@ -35,6 +35,12 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
     matched_methods = Base._methods_by_ftype(Tuple{f,args...}, -1, world)
     length(matched_methods) == 1 || error("did not uniquely match method")
     type_signature, raw_static_params, method = first(matched_methods)
+    if method.pure
+        @info "Won't overdub pure function"
+        global_logger(old_logger)
+        return :(f(args...))
+    end
+
     ## initial CodeInfo
     method_instance = Core.Compiler.code_for_method(method, type_signature, raw_static_params, world, false)
     method_signature = method.sig
@@ -95,7 +101,6 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
                     (isa(orig_func, GlobalRef) && orig_func.name == :(&)) ||
                     (isa(orig_func, GlobalRef) && orig_func.name == :(|)) ||
                     (isa(orig_func, GlobalRef) && orig_func.name == :Int) ||
-                    (isa(orig_func, GlobalRef) && orig_func.name == :datatype_align) ||
                     orig_func == GlobalRef(Base, :literal_pow) ||
                     orig_func == GlobalRef(Base, :getproperty) ||
                     (isa(orig_func, GlobalRef) && orig_func.mod == Core)
