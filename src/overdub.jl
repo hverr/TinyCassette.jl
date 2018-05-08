@@ -89,6 +89,7 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
         if Meta.isexpr(item, :call)
             orig_func = item.args[1]
 
+            # TODO: Fix me, this is hacky
             if isa(orig_func, GlobalRef) && orig_func.mod == Core
                 continue
             end
