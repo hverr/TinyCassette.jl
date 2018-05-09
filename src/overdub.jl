@@ -91,7 +91,8 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
 
             # TODO: Fix me, this is hacky
             if (isa(orig_func, GlobalRef) && orig_func.mod == Core) ||
-               orig_func == GlobalRef(Main, :eltype)
+               orig_func == GlobalRef(Main, :eltype) ||
+               orig_func == GlobalRef(Base, :to_indices)
                 continue
             end
 
