@@ -8,4 +8,9 @@ using Test: @testset, @test, @test_throws
     include("test_vararg.jl")
     include("test_infer.jl")
     include("test_generated.jl")
+
+    # this currently doesn't work: wait until
+    # we can set world-age bounds on emitted
+    # code info
+    #include("test_recompilation.jl")
 end
