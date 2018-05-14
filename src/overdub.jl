@@ -6,11 +6,11 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
     # configure the global logger to use plain stderr so that we can log without task switches
     old_logger = global_logger()
     global_logger(Logging.ConsoleLogger(Core.stderr))
-    @info "Overdubbing function call" func=f types=args inbounds=inbounds
+    @debug "Overdubbing function call" func=f types=args inbounds=inbounds
 
     # don't recurse into Core
     if parentmodule(f) == Core || f == typeof(Base.getindex)
-        @info "Can't overdub Core function"
+        @debug "Can't overdub Core function"
         global_logger(old_logger)
         if inbounds <: Val{true}
             return :(@inbounds f(args...))
@@ -36,7 +36,7 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
     length(matched_methods) == 1 || error("did not uniquely match method")
     type_signature, raw_static_params, method = first(matched_methods)
     if method.pure
-        @info "Won't overdub pure function"
+        @debug "Won't overdub pure function"
         global_logger(old_logger)
         return :(f(args...))
     end
@@ -196,7 +196,7 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
         @error "Encountered invalid code" code=body.args error=e
     end
 
-    @info "Rewriting code" original=original_code_info overdubbed=code_info
+    @debug "Rewriting code" original=original_code_info overdubbed=code_info
     global_logger(old_logger)
     return code_info
 end
