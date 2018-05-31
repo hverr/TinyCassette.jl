@@ -69,6 +69,7 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
 
     worklist = Any[map(item->(item,item), body.args)...] # item & pos to insert before
     inbounds_stack = Bool[]
+    global_ref_ssa_values = Dict{Core.SSAValue, GlobalRef}()
     while !isempty(worklist)
         item, paren = popfirst!(worklist)
 
@@ -86,16 +87,36 @@ function overdub_recurse_gen(self, inbounds, ctx, f, args)
             prepend!(worklist, map(item->(item,paren), item.args))
         end
 
+        if Meta.isexpr(item, :(=))
+            lhs, rhs = item.args
+            if isa(lhs, Core.SSAValue) && isa(rhs, GlobalRef)
+                global_ref_ssa_values[lhs] = rhs
+            end
+        end
+
+
         if Meta.isexpr(item, :call)
             orig_func = item.args[1]
 
             # TODO: Fix me, this is hacky
-            if (isa(orig_func, GlobalRef) && orig_func.mod == Core) ||
-               (isa(orig_func, GlobalRef) && orig_func.name == :Val) ||
-               orig_func == GlobalRef(Main, :eltype) ||
-               orig_func == GlobalRef(Base, :to_indices)
+            check_func = orig_func
+            if isa(check_func, Core.SSAValue) && haskey(global_ref_ssa_values, check_func)
+                check_func = global_ref_ssa_values[check_func]
+            end
+
+            if (isa(check_func, GlobalRef) && check_func.mod == Core) ||
+               (isa(check_func, GlobalRef) && check_func.mod == Core.Intrinsics) ||
+               (isa(check_func, GlobalRef) && check_func.name == :Val) ||
+               (isa(check_func, GlobalRef) && check_func.name == :getfield) ||
+               (isa(check_func, GlobalRef) && check_func.name == :getproperty) ||
+               (isa(check_func, GlobalRef) && check_func.name == :not_int) ||
+               check_func == GlobalRef(Main, :eltype) ||
+               check_func == GlobalRef(Main, :(:)) ||
+               check_func == GlobalRef(Base, :iterate) ||
+               check_func == GlobalRef(Base, :to_indices)
                 continue
             end
+
 
             if !isempty(inbounds_stack) || inbounds <: Val{true}
                 item.args[1] = GlobalRef(@__MODULE__, :execute_inbounds)
